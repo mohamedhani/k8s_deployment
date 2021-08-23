@@ -1,0 +1,82 @@
+- hosts: all
+  vars:
+    cluster_version: 1.18.0
+    region: us-east-1
+
+  tasks:
+  - name: unarchive aws zip file
+    unarchive: 
+      src: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+      dest: /tmp/
+      remote_src: true
+  - name: install aws
+    command: /tmp/aws/install
+      remote_src: true 
+
+      
+  - name: unarchive the helm package
+    unarchive: 
+      src: https://get.helm.sh/helm-v3.6.2-linux-amd64.tar.gz
+      dest: /tmp/
+
+
+  - name: copy helm commannd to bin
+    copy:
+      src: /tmp/linux-amd64/helm
+      dest: /bin/helm
+      mode: u+x,g+x,o+x
+      owner: root
+      group: root
+      remote_src: true  
+    become: true
+
+
+
+  - name: download kubectl
+    get_url:
+      url: https://dl.k8s.io/release/v{{ cluster_version }}/bin/linux/amd64/kubectl
+      dest: /tmp/
+    
+  - name: install kubectl
+    copy: 
+      src: kubectl
+      dest: /bin/
+      owner: root
+      group: root
+      mode: u+x,g+x,o+x
+      remote_src: true 
+    become: true
+  
+
+
+  - name: get kubeconfig file
+    command: aws ssm get-parameter --name /k8s/kubeconfig --with-decryption --query Parameter.Value --region {{ region }}
+    register: kubeconfig
+  
+  - name: setup kubeconfigfile
+    copy:
+      content: "{{ kubeconfig.stdout }}" 
+      dest: ~/.kube/config
+
+  - name: get jfrog username
+    command: aws ssm get-parameter --name /jfrog/username --with-decryption --query Parameter.Value --region {{ region }}
+    register: jfrog_username
+
+  - name: get jfrog password
+    command: aws ssm get-parameter --name /jfrog/password --with-decryption --query Parameter.Value --region {{ region }}
+    register: jfrog_password
+ 
+
+  - name: intialze helm repo 
+    command: helm repo add task-helm https://vodatask.jfrog.io/artifactory/task-helm --username {{ jfrog_username.stdout }} --password {{ jfrog_password.stdout }}
+
+  
+  - name:  install package 
+    command: helm upgrade {{ release_name }} task-helm/{{ chart_name }} --version {{ version }} --namespace {{ namespace }} --install
+    
+
+
+  - 
+      
+
+
