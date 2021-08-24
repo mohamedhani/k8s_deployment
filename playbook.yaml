@@ -2,6 +2,7 @@
   vars:
     cluster_version: 1.18.0
     region: us-east-1
+    eks_cluster_name: task-eks-cluster
 
   tasks:
   - name: unarchive aws zip file
@@ -49,15 +50,10 @@
   
 
 
-  - name: get kubeconfig file
-    command: aws ssm get-parameter --name /k8s/kubeconfig --with-decryption --query Parameter.Value --region {{ region }}
+  - name: update kubeconfig file
+    command:  aws eks update-kubeconfig --name {{ eks_cluster_name }} --region {{ region }}
     register: kubeconfig
   
-  - name: setup kubeconfigfile
-    copy:
-      content: "{{ kubeconfig.stdout }}" 
-      dest: ~/.kube/config
-
   - name: get jfrog username
     command: aws ssm get-parameter --name /jfrog/username --with-decryption --query Parameter.Value --region {{ region }}
     register: jfrog_username
@@ -67,7 +63,7 @@
     register: jfrog_password
  
 
-  - name: intialze helm repo 
+  - name: add jfrong helm repo to helm
     command: helm repo add task-helm https://vodatask.jfrog.io/artifactory/task-helm --username {{ jfrog_username.stdout }} --password {{ jfrog_password.stdout }}
 
   
