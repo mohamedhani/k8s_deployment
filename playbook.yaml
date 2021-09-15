@@ -1,78 +1,76 @@
-- hosts: all
+- hosts: localhost
   vars:
-    cluster_version: 1.18.0
     region: us-east-1
     eks_cluster_name: task-eks-cluster
 
   tasks:
+  
   - name: unarchive aws zip file
     unarchive: 
       src: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
       dest: /tmp/
       remote_src: true
+    tags: setup
+
   - name: install aws
     command: /tmp/aws/install
-      remote_src: true 
+    become: true
+    tags: setup
 
       
   - name: unarchive the helm package
     unarchive: 
       src: https://get.helm.sh/helm-v3.6.2-linux-amd64.tar.gz
       dest: /tmp/
+    tags: setup
 
 
   - name: copy helm commannd to bin
     copy:
       src: /tmp/linux-amd64/helm
       dest: /bin/helm
-      mode: u+x,g+x,o+x
+      mode: u+tagx,g+x,o+x
       owner: root
       group: root
       remote_src: true  
     become: true
-
-
-
-  - name: download kubectl
-    get_url:
-      url: https://dl.k8s.io/release/v{{ cluster_version }}/bin/linux/amd64/kubectl
-      dest: /tmp/
-    
-  - name: install kubectl
-    copy: 
-      src: kubectl
-      dest: /bin/
-      owner: root
-      group: root
-      mode: u+x,g+x,o+x
-      remote_src: true 
-    become: true
-  
-
+    tags: setup
 
   - name: update kubeconfig file
     command:  aws eks update-kubeconfig --name {{ eks_cluster_name }} --region {{ region }}
     register: kubeconfig
-  
+    tags: setup
+
+
   - name: get jfrog username
     command: aws ssm get-parameter --name /jfrog/username --with-decryption --query Parameter.Value --region {{ region }}
     register: jfrog_username
+    tags: deploy
 
   - name: get jfrog password
     command: aws ssm get-parameter --name /jfrog/password --with-decryption --query Parameter.Value --region {{ region }}
     register: jfrog_password
- 
+    tags: deploy
 
-  - name: add jfrong helm repo to helm
-    command: helm repo add task-helm https://vodatask.jfrog.io/artifactory/task-helm --username {{ jfrog_username.stdout }} --password {{ jfrog_password.stdout }}
 
-  
-  - name:  install package 
-    command: helm upgrade {{ release_name }} task-helm/{{ chart_name }} --version {{ version }} --namespace {{ namespace }} --install
+    
+  - name: add jfrog helm repo
+    community.kubernetes.helm_repository:
+      name: task-helm
+      repo_url: "https://vodatask.jfrog.io/artifactory/task-helm"
+      repo_username: "{{ jfrog_username.stdout }}"
+      repo_password: "{{ jfrog_password.stdout }}"
+    tags: deploy
     
 
+  - name: install package 
+    community.kubernetes.helm:
+      name : "{{ release_name }}"
+      chart_ref: "task-helm/{{ chart_name }}"
+      chart_version: "{{ version }}"
+      release_namespace: "{{ namespace }}"
+      force: true
+    tags: deploy
 
-  - 
-      
 
 

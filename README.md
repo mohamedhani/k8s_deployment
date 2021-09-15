@@ -4,7 +4,13 @@
    * /jfrog/username
    * /jfrog/password 
 2) aws policy to describe eks cluster "task-eks-cluster"
-2) access on the kms key used by encrypt above parameters
+3) access on the kms key used by encrypt above parameters
+4) install the following module using this command 
+```bash
+
+   ansible-galaxy collection install community.kubernetes
+   
+```
 
 
 ## How Run playbook 
